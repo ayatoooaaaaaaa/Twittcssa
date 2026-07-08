@@ -1,7 +1,6 @@
 import streamlit as st
 import tweepy
 
-# ⚠️ 鍵の設定（Secrets）はそのままで大丈夫です
 CLIENT_ID = st.secrets["X_CLIENT_ID"]
 CLIENT_SECRET = st.secrets["X_CLIENT_SECRET"]
 
@@ -16,7 +15,6 @@ else:
 
 scopes = ["tweet.read", "tweet.write", "users.read"]
 
-# エラーの原因だったセッション保存を一切やめ、毎回新しくハンドラーを作ります
 auth_handler = tweepy.OAuth2UserHandler(
     client_id=CLIENT_ID,
     redirect_uri=CALLBACK_URL,
@@ -29,10 +27,14 @@ if "code" in st.query_params:
     st.success("Xとの連携を認証中...")
     
     try:
-        code_param = st.query_params["code"]
-        
-        # エラー回避：状態のチェックをスキップして直接トークンを取りにいきます
-        token = auth_handler.fetch_token(code_param)
+        # Xから戻ってきたときのアクセスURL（認証コードが含まれる全体）を生成
+        # これをfetch_tokenに渡すことでエラーを回避します
+        current_url = f"{CALLBACK_URL}?code={st.query_params['code']}"
+        if "state" in st.query_params:
+            current_url += f"&state={st.query_params['state']}"
+            
+        # 引数に authorization_response としてURL全体を正しく渡す
+        token = auth_handler.fetch_token(authorization_response=current_url)
         
         # クライアントの作成
         client = tweepy.Client(access_token=token["access_token"])
@@ -67,7 +69,7 @@ if "code" in st.query_params:
                 st.success(f"✨ 完了しました！ 削除件数: {success_count} / {len(tweets.data)}")
                 
     except Exception as e:
-        st.error(f"ログイン処理中にエラーが発生しました。時間を置いて試すか、アプリ設定を確認してください: {e}")
+        st.error(f"ログイン処理中にエラーが発生しました。アプリ設定を確認してください: {e}")
 else:
     st.info("下のボタンからX（Twitter）アカウントと連携してください。APIキーの入力は不要です！")
     try:
